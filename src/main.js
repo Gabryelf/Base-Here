@@ -2,18 +2,22 @@ import { EventBus } from './core/EventBus.js';
 import { GameLoop } from './core/GameLoop.js';
 import { GameState } from './core/GameState.js';
 import { ModeManager } from './core/ModeManager.js';
+import { TurnManager } from './core/TurnManager.js';
 import { Screen } from './render/Screen.js';
 import { Camera } from './render/Camera.js';
 import { InputManager } from './input/InputManager.js';
 import { StrategyMode } from './modes/StrategyMode.js';
 import { PlaceholderMode } from './modes/PlaceholderMode.js';
+import { UIManager } from './ui/UIManager.js';
+import { FACTION_PLAYER } from './data/Factions.js';
 
 function boot() {
   const canvas = document.getElementById('game-canvas');
   const debugPanel = document.getElementById('debug-panel');
+  const turnBanner = document.getElementById('turn-banner');
 
   const bus = new EventBus();
-  const state = new GameState();
+  const state = new GameState({ seed: Date.now() & 0xffff, radius: 8 });
   const screen = new Screen(canvas);
   const camera = new Camera(screen);
 
@@ -28,15 +32,30 @@ function boot() {
   modeManager.register('tactical', tacticalMode);
   modeManager.register('build', buildMode);
 
-  const input = new InputManager({
-    canvas,
-    camera,
+  const turnManager = new TurnManager({ state, bus });
+
+  // Ввод
+  new InputManager({
+    canvas, camera,
     onPointerDown: (world, screenPos) => modeManager.onPointerDown(world, screenPos),
-    onPointerUp: (world, screenPos) => modeManager.onPointerUp(world, screenPos),
+    onPointerUp:   (world, screenPos) => modeManager.onPointerUp(world, screenPos),
     onPointerMove: (world, screenPos) => modeManager.onPointerMove(world, screenPos),
   });
 
   // UI
+  new UIManager({ state, bus });
+
+  // Центрируем камеру на столице игрока
+  const playerCapital = [...state.strategy.tiles.values()]
+    .find((t) => t.owner === FACTION_PLAYER && t.capital);
+  if (playerCapital) {
+    const size = state.strategy.hexSize;
+    const SQRT3 = Math.sqrt(3);
+    camera.x = size * (SQRT3 * playerCapital.q + (SQRT3 / 2) * playerCapital.r);
+    camera.y = size * (1.5 * playerCapital.r);
+  }
+
+  // Кнопки режимов
   document.getElementById('btn-mode-strategy').addEventListener('click', () => {
     modeManager.switchTo('strategy');
   });
@@ -46,17 +65,61 @@ function boot() {
   document.getElementById('btn-mode-build').addEventListener('click', () => {
     modeManager.switchTo('build');
   });
-  document.getElementById('btn-end-turn').addEventListener('click', () => {
-    state.turn += 1;
-    bus.emit('turn:ended', { turn: state.turn });
+
+  // Кнопка "Конец хода"
+  const btnEndTurn = document.getElementById('btn-end-turn');
+  btnEndTurn.addEventListener('click', () => {
+    if (!turnManager.isPlayerTurn()) return;
+    turnManager.endTurn();
   });
 
-  // Реакции на события
-  bus.on('mode:changed', ({ name }) => {
-    console.log('[mode]', name);
+  // Обновление состояния кнопки "Конец хода"
+  function refreshEndTurnButton() {
+    const isPlayer = turnManager.isPlayerTurn();
+    btnEndTurn.disabled = !isPlayer;
+    btnEndTurn.textContent = isPlayer ? 'Конец хода' : 'Ход противника…';
+  }
+
+  // Реакция на смену хода — баннер и обновление кнопки
+  let bannerTimer = 0;
+  bus.on('turn:started', ({ faction }) => {
+    refreshEndTurnButton();
+    // Показываем баннер "Ваш ход" / "Ход противника"
+    const isPlayer = faction === FACTION_PLAYER;
+    turnBanner.textContent = isPlayer ? 'Ваш ход' : 'Ход противника';
+    turnBanner.classList.add('visible');
+    clearTimeout(bannerTimer);
+    bannerTimer = setTimeout(() => turnBanner.classList.remove('visible'), 900);
+
+    // Автопрокрутка ИИ, если сейчас не ход игрока
+    if (!isPlayer) {
+      setTimeout(() => {
+        // Проверяем актуальность, вдруг что-то изменилось
+        if (!turnManager.isPlayerTurn()) turnManager.endTurn();
+      }, 700);
+    }
   });
-  bus.on('strategy:tileSelected', ({ q, r }) => {
-    console.log('[tile]', q, r);
+
+  bus.on('turn:newRound', ({ turn }) => {
+    console.log('[new round]', turn);
+  });
+
+  // Клик по действиям из панели ячейки
+  bus.on('ui:tileAction', ({ action, tile }) => {
+    if (action === 'build') {
+      state.build.locationKey = tile.key;
+      modeManager.switchTo('build');
+    } else if (action === 'attack') {
+      state.tactical.locationKey = tile.key;
+      modeManager.switchTo('tactical');
+    } else if (action === 'capture') {
+      // Нейтрал без гарнизона — захватываем сразу
+      if (tile.owner === 'neutral' && tile.garrison === 0) {
+        tile.owner = FACTION_PLAYER;
+        tile.garrison = 1;
+        bus.emit('tile:captured', { faction: FACTION_PLAYER, q: tile.q, r: tile.r });
+      }
+    }
   });
 
   // Игровой цикл
@@ -69,30 +132,29 @@ function boot() {
     },
   });
 
-  let fps = 0;
-  let fpsAcc = 0;
-  let fpsFrames = 0;
-  let fpsTimer = 0;
+  let fps = 0, fpsFrames = 0, fpsTimer = 0, lastT = performance.now();
   function updateDebug() {
-    // Простой счётчик FPS без раскачки
+    const now = performance.now();
     fpsFrames++;
-    fpsTimer += 1 / 60;
+    fpsTimer += (now - lastT) / 1000;
+    lastT = now;
     if (fpsTimer >= 0.5) {
       fps = Math.round(fpsFrames / fpsTimer);
-      fpsFrames = 0;
-      fpsTimer = 0;
+      fpsFrames = 0; fpsTimer = 0;
     }
     const s = state.strategy.selected;
     debugPanel.textContent =
-      `mode: ${modeManager.currentName}\n` +
-      `turn: ${state.turn}\n` +
-      `fps:  ${fps}\n` +
-      `zoom: ${camera.zoom.toFixed(2)}\n` +
-      `cam:  ${camera.x.toFixed(0)}, ${camera.y.toFixed(0)}\n` +
-      (s ? `sel:  ${s.q}, ${s.r}` : 'sel:  —');
+      `mode:  ${modeManager.currentName}\n` +
+      `turn:  ${state.turn}  (${state.currentFaction})\n` +
+      `fps:   ${fps}\n` +
+      `zoom:  ${camera.zoom.toFixed(2)}\n` +
+      `cam:   ${camera.x.toFixed(0)}, ${camera.y.toFixed(0)}\n` +
+      (s ? `sel:   ${s.q}, ${s.r}` : 'sel:   —');
   }
 
+  // Стартуем игру
   modeManager.switchTo('strategy');
+  turnManager.start();
   loop.start();
 }
 
