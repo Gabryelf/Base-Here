@@ -10,6 +10,7 @@ import { StrategyMode } from './modes/StrategyMode.js';
 import { PlaceholderMode } from './modes/PlaceholderMode.js';
 import { UIManager } from './ui/UIManager.js';
 import { FACTION_PLAYER } from './data/Factions.js';
+import { TacticalMode } from './modes/TacticalMode.js';
 
 function boot() {
   const canvas = document.getElementById('game-canvas');
@@ -25,7 +26,7 @@ function boot() {
   const modeManager = new ModeManager(modeContext);
 
   const strategyMode = new StrategyMode(modeContext);
-  const tacticalMode = new PlaceholderMode(modeContext, 'tactical', '#3fb950');
+  const tacticalMode = new TacticalMode(modeContext);
   const buildMode = new PlaceholderMode(modeContext, 'build', '#d29922');
 
   modeManager.register('strategy', strategyMode);
@@ -102,6 +103,11 @@ function boot() {
 
   bus.on('turn:newRound', ({ turn }) => {
     console.log('[new round]', turn);
+  });
+
+  // Переключение режима по запросу из тактики
+  bus.on('mode:requestSwitch', ({ name }) => {
+    modeManager.switchTo(name);
   });
 
   // Клик по действиям из панели ячейки

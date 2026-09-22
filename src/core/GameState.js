@@ -25,7 +25,7 @@ export class GameState {
     };
 
     // Тактический / строительный слои — заглушки
-    this.tactical = { active: false, locationKey: null };
+    this.tactical = { active: false, locationKey: null, battle: null };
     this.build = { active: false, locationKey: null };
   }
 
