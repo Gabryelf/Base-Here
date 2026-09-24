@@ -89,10 +89,14 @@ export class TilePanel {
       </h3>
       <div class="row"><span>Тип</span><b>${tile.type}</b></div>
       <div class="row"><span>Координаты</span><b>${tile.q}, ${tile.r}</b></div>
-      <div class="row"><span>Оборона</span><b>${tile.defense}</b></div>
+      ${tile.getTotalDefense()}
       ${tile.garrison > 0 ? `<div class="row"><span>Гарнизон</span><b>${tile.garrison}</b></div>` : ''}
       ${tile.hasLocation ? `<div class="row"><span>Локация</span><b>да</b></div>` : ''}
       <div class="row"><span>Доход</span><b>${y.credits}💰 / ${y.material}🔩 / ${y.energy}⚡</b></div>
+      ${tile.hasLocation && tile.location
+        ? `<div class="row"><span>Постройки</span><b>${tile.location.getBuildings().length}/6</b></div>`
+        : ''}
+      <div class="row"><span>Оборона</span><b>${tile.getTotalDefense()}</b></div>
       ${actionsHtml}
     `;
   }

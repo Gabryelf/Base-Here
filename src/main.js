@@ -11,6 +11,7 @@ import { PlaceholderMode } from './modes/PlaceholderMode.js';
 import { UIManager } from './ui/UIManager.js';
 import { FACTION_PLAYER } from './data/Factions.js';
 import { TacticalMode } from './modes/TacticalMode.js';
+import { BuildMode } from './modes/BuildMode.js';
 
 function boot() {
   const canvas = document.getElementById('game-canvas');
@@ -27,7 +28,7 @@ function boot() {
 
   const strategyMode = new StrategyMode(modeContext);
   const tacticalMode = new TacticalMode(modeContext);
-  const buildMode = new PlaceholderMode(modeContext, 'build', '#d29922');
+  const buildMode = new BuildMode(modeContext);
 
   modeManager.register('strategy', strategyMode);
   modeManager.register('tactical', tacticalMode);

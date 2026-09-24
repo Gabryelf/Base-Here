@@ -2,6 +2,7 @@ import { Tile, TILE_TYPES } from './Tile.js';
 import { createRng, randInt, pick } from '../utils/rng.js';
 import { hexKey } from '../utils/hex.js';
 import { FACTION_PLAYER, FACTION_NEUTRAL, AI_FACTIONS } from './Factions.js';
+import { Location } from './Location.js';
 
 // Генерирует карту в виде Map<"q,r", Tile> + ставит стартовые столицы.
 export function generateMap({ seed = 1337, radius = 8 } = {}) {
@@ -78,6 +79,15 @@ export function generateMap({ seed = 1337, radius = 8 } = {}) {
     if (tile.owner === FACTION_NEUTRAL && tile.hasLocation) {
       tile.garrison = randInt(rng, 1, 3);
       tile.defense = 2 + tile.garrison;
+    }
+  }
+
+  for (const tile of tiles.values()) {
+    if (tile.hasLocation) {
+      tile.location = new Location({
+        tileKey: hexKey(tile.q, tile.r),
+        seed: (tile.q * 374761393) ^ (tile.r * 668265263),
+      });
     }
   }
 
