@@ -9,12 +9,9 @@
     html, body {
       margin: 0; padding: 0;
       width: 100%; height: 100%;
-      overflow: hidden;
-      background: #0b0d10;
-      color: #e6e6e6;
+      overflow: hidden; background: #0b0d10; color: #e6e6e6;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      -webkit-user-select: none; user-select: none;
-      touch-action: none;
+      -webkit-user-select: none; user-select: none; touch-action: none;
     }
     #game-canvas {
       position: fixed; inset: 0; display: block;
@@ -25,81 +22,144 @@
 
     .hud-top {
       position: absolute; top: 0; left: 0; right: 0;
-      padding: 10px 12px; padding-top: max(10px, env(safe-area-inset-top));
-      display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
-      background: linear-gradient(to bottom, rgba(0,0,0,0.65), rgba(0,0,0,0));
+      padding: 8px 10px;
+      padding-top: max(8px, env(safe-area-inset-top));
+      display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.7), rgba(0,0,0,0));
     }
     .btn {
       background: #1c2128; color: #e6e6e6;
       border: 1px solid #2d333b; border-radius: 6px;
-      padding: 8px 12px; font-size: 14px; cursor: pointer;
+      padding: 8px 12px; font-size: 13px; cursor: pointer;
+      white-space: nowrap;
     }
     .btn:hover  { background: #22272e; }
     .btn:active { background: #2d333b; }
     .btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+    .btn.primary { background: #1f6feb; border-color: #1f6feb; }
+    .btn.primary:hover { background: #2973f0; }
+    .btn.danger { background: #7a1f1f; border-color: #a32c2c; }
 
     .resources {
-      display: flex; gap: 12px; margin-left: auto;
-      background: rgba(22, 27, 34, 0.85);
+      display: flex; gap: 10px; margin-left: auto;
+      background: rgba(22, 27, 34, 0.9);
       border: 1px solid #2d333b; border-radius: 8px;
-      padding: 6px 12px; font-size: 13px;
+      padding: 6px 10px; font-size: 12px;
     }
     .resources .res { display: flex; align-items: center; gap: 4px; }
     .resources .dot {
-      width: 10px; height: 10px; border-radius: 50%; display: inline-block;
+      width: 9px; height: 9px; border-radius: 50%; display: inline-block;
+    }
+    .ap-badge {
+      background: rgba(31, 111, 235, 0.15);
+      border: 1px solid #1f6feb; border-radius: 8px;
+      padding: 6px 10px; font-size: 12px; font-weight: 600;
+      color: #58a6ff;
     }
 
     .hud-bottom {
       position: absolute; left: 0; right: 0; bottom: 0;
-      padding: 10px 12px; padding-bottom: max(10px, env(safe-area-inset-bottom));
+      padding: 8px 10px;
+      padding-bottom: max(8px, env(safe-area-inset-bottom));
       display: flex; gap: 8px; justify-content: flex-end;
       align-items: flex-end;
     }
 
-    .tile-panel {
+    .side-panel {
       position: absolute;
-      right: 12px; bottom: 74px;
-      width: min(320px, calc(100vw - 24px));
-      background: rgba(22, 27, 34, 0.96);
+      right: 10px; top: 56px; bottom: 80px;
+      width: min(340px, calc(100vw - 20px));
+      background: rgba(22, 27, 34, 0.97);
       border: 1px solid #2d333b; border-radius: 10px;
-      padding: 12px 14px;
+      padding: 12px; overflow-y: auto;
       box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-      display: none;
+      display: none; font-size: 13px;
     }
-    .tile-panel.visible { display: block; }
-    .tile-panel h3 {
+    .side-panel.visible { display: block; }
+    .side-panel h3 {
       margin: 0 0 8px 0; font-size: 15px;
       display: flex; align-items: center; gap: 8px;
     }
-    .tile-panel .swatch {
+    .side-panel .swatch {
       width: 12px; height: 12px; border-radius: 3px;
     }
-    .tile-panel .row {
+    .side-panel .row {
       display: flex; justify-content: space-between;
-      font-size: 13px; padding: 2px 0; color: #adbac7;
+      font-size: 12px; padding: 3px 0; color: #adbac7;
     }
-    .tile-panel .row b { color: #e6e6e6; font-weight: 500; }
-    .tile-panel .actions {
+    .side-panel .row b { color: #e6e6e6; font-weight: 500; }
+    .side-panel .actions {
       display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap;
     }
-    .tile-panel .actions .btn { flex: 1; min-width: 80px; }
+    .side-panel .actions .btn { flex: 1; min-width: 80px; }
 
     .turn-banner {
       position: absolute; top: 50%; left: 50%;
       transform: translate(-50%, -50%);
-      background: rgba(13, 17, 23, 0.9);
+      background: rgba(13, 17, 23, 0.92);
       border: 1px solid #2d333b; border-radius: 12px;
-      padding: 18px 28px;
-      font-size: 20px; font-weight: 600;
+      padding: 16px 26px; font-size: 18px; font-weight: 600;
       opacity: 0; pointer-events: none;
       transition: opacity 0.25s ease;
     }
     .turn-banner.visible { opacity: 1; }
 
     .debug {
-      position: absolute; top: 56px; left: 12px;
-      font-size: 12px; color: #8b949e;
+      position: absolute; top: 52px; left: 10px;
+      font-size: 11px; color: #8b949e;
       pointer-events: none; white-space: pre;
+    }
+
+    /* Модальный слой для армии */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6);
+      display: none; align-items: center; justify-content: center;
+      z-index: 100; padding: 16px;
+    }
+    .modal-overlay.visible { display: flex; }
+    .modal {
+      width: min(520px, 100%);
+      max-height: 80vh; overflow-y: auto;
+      background: #161b22; border: 1px solid #2d333b;
+      border-radius: 12px; padding: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+    }
+    .modal h2 {
+      margin: 0 0 12px 0; font-size: 16px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .unit-card {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px; border: 1px solid #2d333b;
+      border-radius: 8px; margin-bottom: 8px;
+      background: #1c2128;
+    }
+    .unit-card .icon {
+      width: 36px; height: 36px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; font-weight: bold;
+    }
+    .unit-card .meta { flex: 1; min-width: 0; }
+    .unit-card .name { font-weight: 600; color: #e6e6e6; font-size: 13px; }
+    .unit-card .sub  { font-size: 11px; color: #8b949e; margin-top: 2px; }
+    .unit-card .hp-bar {
+      height: 4px; background: #0b0d10; border-radius: 2px;
+      margin-top: 4px; overflow: hidden;
+    }
+    .unit-card .hp-bar > div { height: 100%; background: #3fb950; }
+    .tabs {
+      display: flex; gap: 6px; margin-bottom: 12px;
+      border-bottom: 1px solid #2d333b; padding-bottom: 8px;
+    }
+    .tabs .tab {
+      padding: 6px 10px; font-size: 12px;
+      border-radius: 6px; cursor: pointer;
+      background: transparent; color: #adbac7;
+      border: 1px solid transparent;
+    }
+    .tabs .tab.active {
+      background: #1f6feb; color: white; border-color: #1f6feb;
     }
   </style>
 </head>
@@ -109,21 +169,25 @@
   <div id="ui-overlay">
     <div class="hud-top">
       <button class="btn" id="btn-mode-strategy">Стратегия</button>
-      <button class="btn" id="btn-mode-tactical">Тактика</button>
-      <button class="btn" id="btn-mode-build">Стройка</button>
-
+      <button class="btn" id="btn-army">Армия</button>
+      <button class="btn" id="btn-synergies">Синергии</button>
+      <div class="ap-badge" id="ap-badge">AP: 5/5</div>
       <div class="resources" id="resource-bar"></div>
     </div>
 
     <div class="debug" id="debug-panel"></div>
 
-    <div class="tile-panel" id="tile-panel"></div>
+    <div class="side-panel" id="side-panel"></div>
 
     <div class="hud-bottom">
-      <button class="btn" id="btn-end-turn">Конец хода</button>
+      <button class="btn primary" id="btn-end-turn">Конец хода</button>
     </div>
 
     <div class="turn-banner" id="turn-banner"></div>
+
+    <div class="modal-overlay" id="army-modal">
+      <div class="modal" id="army-modal-content"></div>
+    </div>
   </div>
 
   <script type="module" src="./src/main.js"></script>

@@ -1,8 +1,6 @@
 import { Mode } from '../core/Mode.js';
-import { pixelToHex } from '../utils/hex.js';
+import { pixelToHex, hexKey } from '../utils/hex.js';
 import { StrategyRenderer } from '../render/StrategyRenderer.js';
-import { TILE_TYPES } from '../data/Tile.js';
-import { hexKey } from '../utils/hex.js';
 
 export class StrategyMode extends Mode {
   constructor(ctx) {
@@ -10,13 +8,8 @@ export class StrategyMode extends Mode {
     this.renderer = new StrategyRenderer(ctx);
   }
 
-  onEnter() {
-    this.ctx.state.mode = 'strategy';
-  }
-
-  render() {
-    this.renderer.render();
-  }
+  onEnter() { this.ctx.state.mode = 'strategy'; }
+  render() { this.renderer.render(); }
 
   onPointerDown(worldPos) {
     const { state } = this.ctx;

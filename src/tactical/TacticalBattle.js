@@ -1,82 +1,62 @@
 import { BattleGrid } from './BattleGrid.js';
 import { Unit } from '../data/Unit.js';
-import { UNIT_TYPES } from '../data/UnitTypes.js';
 import { generateBattleMap } from './BattleMapGen.js';
 import { BattleAI } from './BattleAI.js';
 
-// Полное состояние одной тактической битвы.
+// Одна тактическая битва. Обе стороны ходят по очереди по-настоящему.
 export class TacticalBattle {
-  constructor({ attackerFaction, defenderFaction, locationKey, garrison = 3, seed = 1 }) {
+  constructor({
+    attackerFaction, defenderFaction, locationKey,
+    attackerUnits = [], defenderUnits = [], seed = 1,
+  }) {
     this.attackerFaction = attackerFaction;
     this.defenderFaction = defenderFaction;
     this.locationKey = locationKey;
     this.turn = 1;
     this.currentFaction = attackerFaction;
     this.finished = false;
-    this.result = null; // 'attacker' | 'defender'
+    this.result = null;
 
-    // Карта
     const map = generateBattleMap({ seed });
     this.grid = new BattleGrid(map);
 
-    // Юниты: атакующий = 3 базовых, защитник = по гарнизону
-    this._spawnUnits(garrison);
-
+    this._spawn(attackerUnits, defenderUnits);
     this.ai = new BattleAI({ battle: this });
-
-    // Событие — для UI/лога
     this.log = [];
   }
 
-  _spawnUnits(garrison) {
-    // Атакующий: 3 юнита на левом краю
-    const attackerComp = ['infantry', 'infantry', 'scout'];
-    attackerComp.forEach((type, i) => {
-      const unit = new Unit({
-        type,
-        faction: this.attackerFaction,
-        x: 0,
-        y: Math.floor(this.grid.height / 2) - 1 + i,
-      });
-      // Проверка на препятствие — сдвигаем, если занято
-      while (!this.grid.isFree(unit.x, unit.y) && unit.y < this.grid.height - 1) unit.y++;
-      this.grid.addUnit(unit);
-    });
+  _spawn(attackerUnits, defenderUnits) {
+    // Атакующий — слева, защитник — справа
+    this._spawnSide(attackerUnits, 0, this.attackerFaction);
+    this._spawnSide(defenderUnits, this.grid.width - 1, this.defenderFaction);
+  }
 
-    // Защитник: гарнизон решает состав
-    const defenderComp = [];
-    for (let i = 0; i < Math.max(1, garrison); i++) {
-      defenderComp.push(i === 0 && garrison >= 3 ? 'heavy' : 'infantry');
-    }
-    defenderComp.forEach((type, i) => {
-      const unit = new Unit({
-        type,
-        faction: this.defenderFaction,
-        x: this.grid.width - 1,
-        y: Math.floor(this.grid.height / 2) - 1 + i,
-      });
-      while (!this.grid.isFree(unit.x, unit.y) && unit.y > 0) unit.y--;
-      this.grid.addUnit(unit);
+  _spawnSide(units, edgeX, faction) {
+    const baseY = Math.floor(this.grid.height / 2) - Math.floor(units.length / 2);
+    units.forEach((data, i) => {
+      let x = edgeX;
+      let y = Math.max(0, Math.min(this.grid.height - 1, baseY + i));
+      // Ищем свободную клетку в колонке
+      let tries = 0;
+      while (!this.grid.isFree(x, y) && tries < this.grid.height) {
+        y = (y + 1) % this.grid.height;
+        tries++;
+      }
+      const u = new Unit({ type: data.type, faction, x, y, locationKey: data.locationKey });
+      // Сохраняем HP, если пришёл с карты
+      if (typeof data.hp === 'number') u.hp = Math.max(1, data.hp);
+      this.grid.addUnit(u);
     });
   }
 
-  get isPlayerTurn() {
-    return this.currentFaction === this.attackerFaction;
-  }
+  get isPlayerTurn() { return this.currentFaction === this.attackerFaction; }
 
-  // ===== Действия игрока =====
-
-  // Возвращает true, если ход был использован.
-  tryMove(unit, targetX, targetY) {
+  tryMove(unit, tx, ty) {
     if (!unit.alive || unit.faction !== this.currentFaction) return false;
     if (unit.movedThisTurn) return false;
-
-    const reachable = this.grid.reachableTiles(unit, unit.def.move);
-    const key = `${targetX},${targetY}`;
-    if (!reachable.has(key)) return false;
-
-    unit.x = targetX;
-    unit.y = targetY;
+    const reach = this.grid.reachableTiles(unit, unit.def.move);
+    if (!reach.has(`${tx},${ty}`)) return false;
+    unit.x = tx; unit.y = ty;
     unit.movedThisTurn = true;
     this._pushLog(`${unit.name} переместился`);
     return true;
@@ -89,32 +69,29 @@ export class TacticalBattle {
     if (attacker.faction === target.faction) return false;
     if (attacker.distanceTo(target) > attacker.def.range) return false;
 
-    const dmg = attacker.def.attack;
+    let dmg = attacker.def.attack;
+    // Укрытие у защитника снижает урон
+    if (this.grid.isCover(target.x, target.y)) dmg = Math.max(1, dmg - 2);
+    // Буст-клетки: +2 к урону
+    if (this.grid.boostAt(attacker.x, attacker.y) === 'attack') dmg += 2;
+
     target.takeDamage(dmg);
     attacker.attackedThisTurn = true;
-    this._pushLog(`${attacker.name} бьёт ${target.name} на ${dmg}`);
+    this._pushLog(`${attacker.name} → ${target.name}: ${dmg}`);
     if (!target.alive) this._pushLog(`${target.name} уничтожен`);
-
     this._checkVictory();
     return true;
   }
 
-  // ===== Ходы =====
-
   endTurn() {
     if (this.finished) return;
-
-    // Сброс флагов текущей фракции
     for (const u of this.grid.unitsOf(this.currentFaction)) u.resetTurn();
-
     this.grid.removeDeadUnits();
+    this._checkVictory();
+    if (this.finished) return;
 
-    // Передаём ход
     if (this.currentFaction === this.attackerFaction) {
       this.currentFaction = this.defenderFaction;
-      this._checkVictory();
-      if (this.finished) return;
-      // ИИ ходит асинхронно — через серию таймеров, чтобы игрок видел
       this.ai.runTurn();
     } else {
       this.currentFaction = this.attackerFaction;
@@ -125,13 +102,8 @@ export class TacticalBattle {
   _checkVictory() {
     const attackers = this.grid.unitsOf(this.attackerFaction);
     const defenders = this.grid.unitsOf(this.defenderFaction);
-    if (attackers.length === 0) {
-      this.finished = true;
-      this.result = 'defender';
-    } else if (defenders.length === 0) {
-      this.finished = true;
-      this.result = 'attacker';
-    }
+    if (attackers.length === 0) { this.finished = true; this.result = 'defender'; }
+    else if (defenders.length === 0) { this.finished = true; this.result = 'attacker'; }
   }
 
   _pushLog(line) {

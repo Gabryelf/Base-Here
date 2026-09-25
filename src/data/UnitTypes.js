@@ -1,68 +1,43 @@
-// Базовые типы юнитов. Используются и в тактике, и в гарнизоне на карте.
+// Типы войск. Один файл — источник истины для всех юнитов.
 export const UNIT_TYPES = {
-    infantry: {
-      id: 'infantry',
-      name: 'Пехота',
-      hp: 10,
-      attack: 3,
-      range: 1,
-      move: 2,
-      color: '#58a6ff',
-      icon: '●',
-    },
-    heavy: {
-      id: 'heavy',
-      name: 'Тяжёлые',
-      hp: 18,
-      attack: 4,
-      range: 1,
-      move: 1,
-      color: '#a371f7',
-      icon: '■',
-    },
-    scout: {
-      id: 'scout',
-      name: 'Разведка',
-      hp: 6,
-      attack: 2,
-      range: 3,
-      move: 4,
-      color: '#3fb950',
-      icon: '▲',
-    },
-    drone: {
-      id: 'drone',
-      name: 'Дрон',
-      hp: 8,
-      attack: 3,
-      range: 2,
-      move: 2,
-      color: '#d29922',
-      icon: '✦',
-    },
-  };
-  
-  // Состав "типовой группы" по размеру гарнизона.
-  // Гарнизон 1 → 1 пехотинец, 3 → 1 тяжёлый + 2 пехоты и т.д.
-  export function compositionFor(garrisonSize, faction) {
-    const comp = [];
-    let n = garrisonSize;
-    while (n > 0) {
-      if (n >= 3 && comp.length === 0) {
-        comp.push('heavy');
-        n -= 3;
-      } else if (n >= 2 && Math.random() < 0.4) {
-        comp.push('scout');
-        n -= 2;
-      } else {
-        comp.push('infantry');
-        n -= 1;
-      }
-    }
-    // Для игрока-защитника (редкий случай) можно было бы добавлять "drone",
-    // но пока не нужно: игрок всегда атакующий.
-    return comp.map((type) => ({
-      type,
-      faction,
-    }));
-  }
+  infantry: {
+    id: 'infantry',
+    name: 'Пехота',
+    hp: 12, attack: 3, range: 1, move: 2,
+    cost: { credits: 4, material: 2, energy: 0 },
+    upkeep: 1,           // списывается в конце хода
+    color: '#58a6ff', icon: '●',
+    desc: 'Универсальный боец ближнего боя.',
+  },
+  heavy: {
+    id: 'heavy',
+    name: 'Тяжёлые',
+    hp: 22, attack: 5, range: 1, move: 1,
+    cost: { credits: 8, material: 6, energy: 1 },
+    upkeep: 2,
+    color: '#a371f7', icon: '■',
+    desc: 'Медленные, но выносливые и больно бьют.',
+  },
+  scout: {
+    id: 'scout',
+    name: 'Разведка',
+    hp: 8, attack: 2, range: 3, move: 4,
+    cost: { credits: 3, material: 1, energy: 1 },
+    upkeep: 1,
+    color: '#3fb950', icon: '▲',
+    desc: 'Быстрые, бьют с дистанции.',
+  },
+  drone: {
+    id: 'drone',
+    name: 'Дрон',
+    hp: 10, attack: 4, range: 2, move: 3,
+    cost: { credits: 6, material: 2, energy: 3 },
+    upkeep: 2,
+    color: '#d29922', icon: '✦',
+    desc: 'Летающий, игнорирует препятствия.',
+  },
+};
+
+export function getUnitType(id) {
+  return UNIT_TYPES[id] || null;
+}

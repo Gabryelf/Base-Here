@@ -1,7 +1,7 @@
 import { ResourceBar } from './ResourceBar.js';
 import { TilePanel } from './TilePanel.js';
+import { BattleHUD } from './BattleHUD.js';
 
-// Собирает все HTML-панели вместе.
 export class UIManager {
   constructor({ state, bus }) {
     this.resourceBar = new ResourceBar(
@@ -9,8 +9,9 @@ export class UIManager {
       { state, bus },
     );
     this.tilePanel = new TilePanel(
-      document.getElementById('tile-panel'),
+      document.getElementById('side-panel'),
       { state, bus },
     );
+    this.battleHUD = new BattleHUD({ state, bus });
   }
 }
