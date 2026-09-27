@@ -1,5 +1,5 @@
 import { buildingsForSlot, getBuilding } from '../data/Buildings.js';
-import { activeSynergies, nearlyActiveSynergies, SYNERGIES } from '../data/Synergies.js';
+import { activeSynergies, nearlyActiveSynergies } from '../data/Synergies.js';
 import { FACTION_PLAYER } from '../data/Factions.js';
 
 export class BuildPanel {
@@ -24,6 +24,7 @@ export class BuildPanel {
     this.bus.on('build:updated', () => this._render());
     this.bus.on('mode:changed', ({ name }) => { if (name !== 'build') this.hide(); });
     this.bus.on('resources:changed', () => this._render());
+    this.bus.on('ap:changed', () => this._render());
 
     this.el.addEventListener('click', (e) => {
       const buildId = e.target.getAttribute?.('data-build');
@@ -41,7 +42,9 @@ export class BuildPanel {
   _render() {
     const loc = this.state.build.activeLocation;
     if (!loc) { this.hide(); return; }
+
     const res = this.state.resources[FACTION_PLAYER];
+    const ap = this.state.ap;
 
     let html = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
@@ -49,7 +52,7 @@ export class BuildPanel {
         <button class="btn" data-close style="padding:4px 10px">Закрыть</button>
       </div>
       <div style="margin-bottom:10px;font-size:12px">
-        💰 ${res.credits}  🔩 ${res.material}  ⚡ ${res.energy}
+        💰 ${res.credits}  🔩 ${res.material}  ⚡ ${res.energy} · <b style="color:#58a6ff">${ap}AP</b>
       </div>
     `;
 
@@ -57,7 +60,7 @@ export class BuildPanel {
       html += `<div style="padding:10px 0;color:#6e7681">Выберите слот на канвасе.</div>`;
     } else {
       const slot = this.selectedSlot;
-      html += `<div style="margin-bottom:8px">Слот: <b style="color:#e6e6e6">${slot.type}</b></div>`;
+      html += `<div style="margin-bottom:8px">Слот: <b style="color:#e6e6e6">${this._slotLabel(slot.type)}</b></div>`;
 
       if (slot.buildingId) {
         const b = getBuilding(slot.buildingId);
@@ -69,29 +72,37 @@ export class BuildPanel {
           <button class="btn" data-remove="${slot.id}" style="width:100%">Снести (+50% ресурсов)</button>
         `;
       } else {
-        // Покажем, какие синергии активируются от каждой постройки
         const currentIds = loc.getBuildings();
+        const currentActive = activeSynergies(currentIds).map((s) => s.id);
         const available = buildingsForSlot(slot.type);
+
         for (const b of available) {
-          const wouldActivate = [];
-          const wouldProgress = [];
           const testIds = [...currentIds, b.id];
-          for (const s of activeSynergies(testIds)) {
-            if (!activeSynergies(currentIds).find(x => x.id === s.id)) {
-              wouldActivate.push(s);
-            }
-          }
-          // Прогресс на 1 шаг
-          for (const ns of nearlyActiveSynergies(testIds)) {
-            wouldProgress.push(ns);
-          }
+          const testActive = activeSynergies(testIds);
+
+          // Синергии, которые активируются от этой постройки
+          const activates = testActive.filter((s) => !currentActive.includes(s.id));
+
+          // Синергии, до которых один шаг (показываем иконки/название намёком)
+          const near = nearlyActiveSynergies(testIds).map(({ synergy, missing }) => {
+            const isHidden = synergy.hidden;
+            return {
+              name: isHidden ? '???' : synergy.name,
+              missingName: isHidden ? '???' : (getBuilding(missing)?.name || missing),
+              hidden: isHidden,
+            };
+          });
 
           const affordable = this.state.canAfford(b.cost);
-          const synergyHtml = wouldActivate
-            .map(s => `<div style="color:#3fb950;font-size:11px;margin-top:2px">✔ Активирует: ${s.name}</div>`)
-            .join('');
-          const progressHtml = wouldProgress.length
-            ? `<div style="color:#8b949e;font-size:11px;margin-top:2px">…Ближе к синергии (${wouldProgress.length})</div>`
+          const canAP = this.state.canSpendAP(1);
+
+          const activateHtml = activates.map((s) => {
+            const label = s.hidden ? '??? (скрытая синергия)' : s.name;
+            return `<div style="color:#3fb950;font-size:11px;margin-top:2px">✔ Активирует: ${label}</div>`;
+          }).join('');
+
+          const nearHtml = near.length
+            ? `<div style="color:#d29922;font-size:11px;margin-top:2px">…Ближе к синергии: ${near.map((n) => n.hidden ? '???' : `«${n.name}»`).join(', ')}</div>`
             : '';
 
           html += `
@@ -99,13 +110,13 @@ export class BuildPanel {
               <div style="color:#e6e6e6;font-weight:600">${b.name}</div>
               <div style="font-size:12px;margin-top:2px">${b.desc}</div>
               <div style="font-size:11px;margin-top:4px;color:#8b949e">
-                💰 ${b.cost.credits} · 🔩 ${b.cost.material} · ⚡ ${b.cost.energy}
+                💰 ${b.cost.credits} · 🔩 ${b.cost.material} · ⚡ ${b.cost.energy} · 1AP
               </div>
-              ${synergyHtml}
-              ${progressHtml}
-              <button class="btn" data-build="${b.id}" ${affordable ? '' : 'disabled'}
+              ${activateHtml}
+              ${nearHtml}
+              <button class="btn" data-build="${b.id}" ${(affordable && canAP) ? '' : 'disabled'}
                 style="width:100%;margin-top:6px">
-                ${affordable ? 'Построить' : 'Не хватает ресурсов'}
+                ${(affordable && canAP) ? 'Построить' : (!canAP ? 'Нет AP' : 'Не хватает ресурсов')}
               </button>
             </div>
           `;
@@ -113,15 +124,22 @@ export class BuildPanel {
       }
     }
 
-    // Общий блок про синергии локации
     const current = activeSynergies(loc.getBuildings());
     if (current.length) {
       html += `<div style="margin-top:12px;padding-top:8px;border-top:1px solid #2d333b">
         <div style="font-size:12px;color:#3fb950;margin-bottom:4px">Активные синергии:</div>
-        ${current.map(s => `<div style="font-size:11px;color:#adbac7">• ${s.name}: ${s.desc}</div>`).join('')}
+        ${current.map((s) => `<div style="font-size:11px;color:#adbac7">• ${s.hidden ? '???' : s.name}: ${s.desc}</div>`).join('')}
       </div>`;
     }
 
     this.el.innerHTML = html;
+  }
+
+  _slotLabel(type) {
+    return {
+      energy: 'Энергия', industrial: 'Промышленность',
+      residential: 'Жильё', military: 'Военный',
+      special: 'Особый',
+    }[type] || type;
   }
 }

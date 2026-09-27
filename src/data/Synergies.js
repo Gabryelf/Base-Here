@@ -1,5 +1,5 @@
-// Синергии. Часть открывается сразу, часть — только при постройке (hidden: true).
-// Показываем игроку намёки (hint) и прогресс.
+// Синергии: часть открывается сразу, часть скрыта до постройки (hidden: true).
+// Показываем намёки и прогресс игроку.
 export const SYNERGIES = [
   {
     id: 'industrial_hub',
@@ -41,7 +41,7 @@ export const SYNERGIES = [
     effect: { yield: { credits: 1, material: 1, energy: 1 }, defense: 0 },
     hint: 'Производство + энергия + жильё = жизнь.',
   },
-  // Скрытые синергии — открываются только после постройки
+  // === Скрытые синергии ===
   {
     id: 'cyber_core',
     name: 'Кибер-ядро',
@@ -60,6 +60,35 @@ export const SYNERGIES = [
     effect: { yield: { credits: 0, material: 4, energy: 0 }, defense: 3 },
     hint: 'Оружие куётся в цехах.',
   },
+  // Дополнительные скрытые синергии — влияют на найм и мораль
+  {
+    id: 'drone_hive',
+    name: 'Гнездо дронов',
+    hidden: true,
+    requires: ['data_hub', 'fusion_reactor'],
+    desc: '−20% к стоимости дронов и +10 морали всем юнитам в начале боя.',
+    effect: {
+      yield: { credits: 0, material: 0, energy: 0 },
+      defense: 0,
+      recruitDiscount: { drone: 0.2 },
+      battleStartMorale: 10,
+    },
+    hint: 'Разум и энергия рождают крылатых слуг.',
+  },
+  {
+    id: 'war_cadre',
+    name: 'Военный костяк',
+    hidden: true,
+    requires: ['barracks', 'arcology'],
+    desc: '−15% к стоимости найма пехоты и +10 HP всем пехотинцам.',
+    effect: {
+      yield: { credits: 0, material: 0, energy: 0 },
+      defense: 0,
+      recruitDiscount: { infantry: 0.15 },
+      hpBonus: { infantry: 10 },
+    },
+    hint: 'Города-крепости растят лучших бойцов.',
+  },
 ];
 
 export function activeSynergies(buildingIds) {
@@ -67,7 +96,7 @@ export function activeSynergies(buildingIds) {
   return SYNERGIES.filter((s) => s.requires.every((id) => set.has(id)));
 }
 
-// Возвращает синергии, до которых игроку осталось 1 постройка — для подсказок.
+// Синергии, до которых осталась 1 постройка — для подсказок в UI.
 export function nearlyActiveSynergies(buildingIds) {
   const set = new Set(buildingIds);
   const result = [];
@@ -76,4 +105,29 @@ export function nearlyActiveSynergies(buildingIds) {
     if (missing.length === 1) result.push({ synergy: s, missing: missing[0] });
   }
   return result;
+}
+
+// Собирает суммарные модификаторы от всех активных синергий локации.
+// Удобно для найма и стартов боя.
+export function collectSynergyEffects(buildingIds) {
+  const effects = {
+    recruitDiscount: {},
+    hpBonus: {},
+    battleStartMorale: 0,
+  };
+  for (const s of activeSynergies(buildingIds)) {
+    const e = s.effect;
+    if (e.recruitDiscount) {
+      for (const [k, v] of Object.entries(e.recruitDiscount)) {
+        effects.recruitDiscount[k] = (effects.recruitDiscount[k] || 0) + v;
+      }
+    }
+    if (e.hpBonus) {
+      for (const [k, v] of Object.entries(e.hpBonus)) {
+        effects.hpBonus[k] = (effects.hpBonus[k] || 0) + v;
+      }
+    }
+    if (e.battleStartMorale) effects.battleStartMorale += e.battleStartMorale;
+  }
+  return effects;
 }
