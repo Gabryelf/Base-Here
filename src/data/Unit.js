@@ -12,14 +12,20 @@ export class Unit {
     this.type = type;
     this.def = def;
     this.faction = faction;
-    this.locationKey = locationKey;  // где стоит на стратегической карте
-    this.x = x;                       // позиция на тактической карте
+    this.locationKey = locationKey;
+    this.x = x;
     this.y = y;
     this.hp = def.hp;
     this.maxHp = def.hp;
+
     this.movedThisTurn = false;
     this.attackedThisTurn = false;
-    this.usedAbility = false;
+    this.usedAbilityThisTurn = false;
+
+    this.morale = 100;                 // 0..100
+    this.abilityCooldown = 0;          // тики в начале хода фракции
+    this.shield = 0;                   // временный бонус защиты (для heavy)
+    this._bonusMove = 0;               // прибавка движения от способностей
   }
 
   get alive() { return this.hp > 0; }
@@ -29,10 +35,54 @@ export class Unit {
   resetTurn() {
     this.movedThisTurn = false;
     this.attackedThisTurn = false;
+    this.usedAbilityThisTurn = false;
   }
 
-  takeDamage(n) { this.hp = Math.max(0, this.hp - n); return this.hp; }
-  heal(n) { this.hp = Math.min(this.maxHp, this.hp + n); return this.hp; }
+  tickCooldowns() {
+    if (this.abilityCooldown > 0) this.abilityCooldown--;
+  }
+
+  takeDamage(n) {
+    this.hp = Math.max(0, this.hp - n);
+    return this.hp;
+  }
+
+  heal(n) {
+    this.hp = Math.min(this.maxHp, this.hp + n);
+    return this.hp;
+  }
+
+  changeMorale(delta) {
+    this.morale = Math.max(0, Math.min(100, this.morale + delta));
+  }
+
+  // Мораль влияет на урон и способность защищаться
+  get moraleMultiplier() {
+    if (this.morale >= 80) return 1;
+    if (this.morale >= 50) return 0.9;
+    if (this.morale >= 25) return 0.75;
+    return 0.5;
+  }
+
+  // Бонус движения с учётом способности
+  get currentMove() {
+    return this.def.move + (this._bonusMove || 0);
+  }
+
+  // Полный боевой урон (до применения укрытий, бустов и т.п.)
+  get attackPower() {
+    const base = this.def.attack * this.moraleMultiplier;
+    return Math.max(1, Math.round(base));
+  }
+
+  useAbility() {
+    if (!this.def.ability) return false;
+    if (this.abilityCooldown > 0) return false;
+    if (this.usedAbilityThisTurn) return false;
+    this.abilityCooldown = this.def.ability.cooldown;
+    this.usedAbilityThisTurn = true;
+    return true;
+  }
 
   distanceTo(other) {
     return Math.abs(this.x - other.x) + Math.abs(this.y - other.y);
@@ -43,6 +93,7 @@ export class Unit {
       id: this.id, type: this.type, faction: this.faction,
       x: this.x, y: this.y, hp: this.hp, maxHp: this.maxHp,
       locationKey: this.locationKey,
+      morale: this.morale, abilityCooldown: this.abilityCooldown,
     };
   }
 }
